@@ -45,14 +45,12 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 ¡Hola! Envíame un enlace de YouTube y te lo descargo en MP3 o MP4."
-    )
+    await update.message.reply_text("👋 ¡Hola! Envíame un enlace de YouTube y te lo descargo en MP3 o MP4.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
     if "youtube.com" not in url and "youtu.be" not in url:
-        await update.message.reply_text("❌ Por favor envíame un enlace válido de YouTube")
+        await update.message.reply_text("❌ Envíame un enlace válido de YouTube.")
         return
 
     await update.message.reply_text("⏳ Descargando tu video...")
@@ -85,7 +83,8 @@ def iniciar_bot():
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app_bot.run_polling(drop_pending_updates=True)
 
-# ---------------- INICIO ----------------
-# Para Render + Gunicorn: se ejecuta cuando __name__ != "__main__"
-if __name__ != "__main__":
+# ---------------- EJECUCIÓN ----------------
+def iniciar_todo():
     threading.Thread(target=iniciar_bot, daemon=True).start()
+
+iniciar_todo()

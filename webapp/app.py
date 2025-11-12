@@ -1,97 +1,89 @@
-from flask import Flask, render_template, request, send_file, redirect, url_for
+from flask import Flask, render_template, request, send_file
+import os
 import yt_dlp
-import os, uuid, pathlib, shutil
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
+import threading
+import asyncio
 
 app = Flask(__name__)
 
-TMP_DIR = "/tmp/descargador_mp3"
-os.makedirs(TMP_DIR, exist_ok=True)
-
+# --- Página principal ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/download', methods=['POST'])
-def download():
-    url = request.form.get('url', '').strip()
-    formato = request.form.get('formato', 'mp3').lower()
-
-    if not url or "youtube.com" not in url and "youtu.be" not in url:
-        return "❌ Enlace no válido. Usa un enlace de YouTube."
-
-    file_id = str(uuid.uuid4())
-    out_template = os.path.join(TMP_DIR, f"{file_id}.%(ext)s")
-    output_mp3 = os.path.join(TMP_DIR, f"{file_id}.mp3")
-    output_mp4 = os.path.join(TMP_DIR, f"{file_id}.mp4")
-
-    # Opciones base
-    ydl_opts = {
-        'outtmpl': out_template,
-        'quiet': True,
-        'noplaylist': True,
-    }
+# --- Descargar desde la web ---
+@app.route('/descargar', methods=['POST'])
+def descargar():
+    url = request.form['url']
+    formato = request.form['formato']
 
     try:
         if formato == 'mp3':
-            ydl_opts.update({
+            nombre = 'audio.mp3'
+            opciones = {
                 'format': 'bestaudio/best',
+                'outtmpl': nombre,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
                     'preferredquality': '192',
-                }]
-            })
-        else:  # mp4 (video)
-            ydl_opts.update({
-                'format': 'bestvideo+bestaudio/best',
-                'merge_output_format': 'mp4',
-            })
+                }],
+            }
+        else:
+            nombre = 'video.mp4'
+            opciones = {'format': 'best', 'outtmpl': nombre}
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(opciones) as ydl:
             ydl.download([url])
 
-        # Encontrar archivo generado
-        if formato == 'mp3' and os.path.exists(output_mp3):
-            return send_file(output_mp3, as_attachment=True, download_name="audio.mp3")
-        else:
-            # buscar .mp4 si existe
-            # yt-dlp puede generar varios nombres (ext variable), buscamos por prefix file_id
-            candidates = list(pathlib.Path(TMP_DIR).glob(f"{file_id}.*"))
-            mp4_candidate = None
-            for c in candidates:
-                if c.suffix.lower() == '.mp4':
-                    mp4_candidate = str(c)
-                    break
-            if formato == 'mp4' and mp4_candidate and os.path.exists(mp4_candidate):
-                return send_file(mp4_candidate, as_attachment=True, download_name="video.mp4")
-
-        return "⚠️ No se pudo generar el archivo. Es posible que el video tenga restricciones de edad o región."
-
+        return send_file(nombre, as_attachment=True)
     except Exception as e:
-        err = str(e)
-        if 'Sign in' in err or 'age' in err:
-            return "⚠️ Este video parece tener restricciones (edad / inicio de sesión). No se puede descargar."
-        return f"❌ Error al procesar: {err}"
+        return f"Ocurrió un error: {str(e)}"
 
-@app.route('/health')
-def health():
-    return "OK"
+# --- BOT TELEGRAM ---
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Limpieza periódica simple: al iniciar, eliminar archivos antiguos (mayores a 1 hora)
-def cleanup_tmp():
-    import time
-    cutoff = time.time() - 3600
-    for p in pathlib.Path(TMP_DIR).iterdir():
-        try:
-            if p.stat().st_mtime < cutoff:
-                if p.is_file():
-                    p.unlink()
-                else:
-                    shutil.rmtree(p)
-        except Exception:
-            pass
+async def start(update, context):
+    await update.message.reply_text("👋 ¡Hola! Envíame un enlace de YouTube y te lo descargo en MP3 o MP4.")
 
-cleanup_tmp()
+async def handle_message(update, context):
+    url = update.message.text
+    if "youtube.com" not in url and "youtu.be" not in url:
+        await update.message.reply_text("Por favor envíame un enlace válido de YouTube 🎥")
+        return
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    await update.message.reply_text("Descargando tu video... ⏳")
+
+    try:
+        opciones = {
+            'format': 'bestaudio/best',
+            'outtmpl': 'temp.mp3',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
+        with yt_dlp.YoutubeDL(opciones) as ydl:
+            ydl.download([url])
+
+        await update.message.reply_audio(open("temp.mp3", "rb"))
+        os.remove("temp.mp3")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error al descargar: {str(e)}")
+
+def iniciar_bot():
+    if not BOT_TOKEN:
+        print("⚠️ No se ha configurado BOT_TOKEN.")
+        return
+    app_telegram = ApplicationBuilder().token(BOT_TOKEN).build()
+    app_telegram.add_handler(CommandHandler("start", start))
+    app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    print("🤖 Bot de Telegram iniciado...")
+    app_telegram.run_polling()
+
+# --- Ejecutar Flask + Bot juntos ---
+if __name__ == "__main__":
+    threading.Thread(target=iniciar_bot).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))

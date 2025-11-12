@@ -3,7 +3,7 @@
         from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
         TOKEN = os.getenv("BOT_TOKEN")  # Añade BOT_TOKEN en Render (Environment variables)
-        WEBAPP_URL = "https://tu-app-en-render.onrender.com"  # Reemplaza por tu URL cuando despliegues
+        WEBAPP_URL = "https://descargador-mp3.onrender.com"  # Reemplaza por tu URL cuando despliegues
 
         async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [

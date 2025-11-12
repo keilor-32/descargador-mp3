@@ -1,18 +1,15 @@
 from flask import Flask, render_template, request, send_file
 import os
-import yt_dlp
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 import threading
-import asyncio
+import yt_dlp
 
+# ---------------- FLASK ----------------
 app = Flask(__name__)
 
-# --- Página principal ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# --- Descargar desde la web ---
 @app.route('/descargar', methods=['POST'])
 def descargar():
     url = request.form['url']
@@ -41,19 +38,24 @@ def descargar():
     except Exception as e:
         return f"Ocurrió un error: {str(e)}"
 
-# --- BOT TELEGRAM ---
+# ---------------- BOT TELEGRAM ----------------
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-async def start(update, context):
-    await update.message.reply_text("👋 ¡Hola! Envíame un enlace de YouTube y te lo descargo en MP3 o MP4.")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "👋 ¡Hola! Envíame un enlace de YouTube y te lo descargo en MP3 o MP4."
+    )
 
-async def handle_message(update, context):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
     if "youtube.com" not in url and "youtu.be" not in url:
-        await update.message.reply_text("Por favor envíame un enlace válido de YouTube 🎥")
+        await update.message.reply_text("❌ Por favor envíame un enlace válido de YouTube")
         return
 
-    await update.message.reply_text("Descargando tu video... ⏳")
+    await update.message.reply_text("⏳ Descargando tu video...")
 
     try:
         opciones = {
@@ -77,13 +79,13 @@ def iniciar_bot():
     if not BOT_TOKEN:
         print("⚠️ No se ha configurado BOT_TOKEN.")
         return
-    app_telegram = ApplicationBuilder().token(BOT_TOKEN).build()
-    app_telegram.add_handler(CommandHandler("start", start))
-    app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 Bot de Telegram iniciado...")
-    app_telegram.run_polling()
+    print("🤖 Iniciando bot de Telegram...")
+    app_bot = ApplicationBuilder().token(BOT_TOKEN).build()
+    app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app_bot.run_polling(drop_pending_updates=True)
 
-# --- Ejecutar Flask + Bot juntos ---
-if __name__ == "__main__":
-    threading.Thread(target=iniciar_bot).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+# ---------------- INICIO ----------------
+# Para Render + Gunicorn: se ejecuta cuando __name__ != "__main__"
+if __name__ != "__main__":
+    threading.Thread(target=iniciar_bot, daemon=True).start()

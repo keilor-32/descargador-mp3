@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, Response
+flask import Flask, render_template, request, send_file, Response
 import os
 import asyncio
 import yt_dlp
@@ -63,14 +63,23 @@ def webhook():
     
     try:
         json_data = request.get_json()
+        print(f"📩 Webhook recibido: {json_data}")
+        
         update = Update.de_json(json_data, bot_app.bot)
         
-        # Procesar la actualización
-        asyncio.run(bot_app.process_update(update))
+        # CAMBIO CRÍTICO: Crear nuevo event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(bot_app.process_update(update))
+        finally:
+            loop.close()
         
         return Response("OK", status=200)
     except Exception as e:
         print(f"❌ Error en webhook: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response(f"Error: {str(e)}", status=500)
 
 # ---------------- BOT TELEGRAM ----------------

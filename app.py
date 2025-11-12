@@ -2,7 +2,8 @@ from flask import Flask, render_template, request, send_file, Response
 import os
 import asyncio
 import yt_dlp
-from telegram import Update
+import requests
+from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ---------------- CONFIGURACIÓN ----------------
@@ -18,9 +19,12 @@ print("=" * 50)
 # ---------------- FLASK ----------------
 app = Flask(__name__)
 
-# Crear aplicación del bot
+# Crear bot y aplicación
+bot = None
 bot_app = None
+
 if BOT_TOKEN:
+    bot = Bot(token=BOT_TOKEN)
     bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 @app.route('/')
@@ -59,18 +63,26 @@ def descargar():
 def webhook():
     """Endpoint para recibir actualizaciones de Telegram"""
     if not bot_app:
+        print("❌ Bot no configurado")
         return Response("Bot not configured", status=500)
     
     try:
         json_data = request.get_json()
+        print(f"📩 Webhook recibido: {json_data}")
+        
         update = Update.de_json(json_data, bot_app.bot)
         
-        # Procesar la actualización
-        asyncio.run(bot_app.process_update(update))
+        # Crear un nuevo event loop para procesar la actualización
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(bot_app.process_update(update))
+        loop.close()
         
         return Response("OK", status=200)
     except Exception as e:
         print(f"❌ Error en webhook: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response(f"Error: {str(e)}", status=500)
 
 # ---------------- BOT TELEGRAM ----------------
@@ -135,6 +147,26 @@ if bot_app:
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("✅ Handlers registrados")
 
+def setup_webhook():
+    """Configurar el webhook automáticamente"""
+    if not BOT_TOKEN:
+        print("❌ No se puede configurar webhook sin BOT_TOKEN")
+        return
+    
+    webhook_url = f"{WEBAPP_URL}/webhook"
+    api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
+    
+    try:
+        response = requests.post(api_url, json={"url": webhook_url})
+        result = response.json()
+        
+        if result.get("ok"):
+            print(f"✅ Webhook configurado: {webhook_url}")
+        else:
+            print(f"❌ Error configurando webhook: {result}")
+    except Exception as e:
+        print(f"❌ Error al configurar webhook: {str(e)}")
+
 # ---------------- EJECUCIÓN ----------------
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 10000))
@@ -142,9 +174,10 @@ if __name__ == '__main__':
     print("🌐 Iniciando servidor Flask...")
     print(f"🔗 URL: {WEBAPP_URL}")
     print(f"📡 Webhook: {WEBAPP_URL}/webhook")
-    print("=" * 50)
     
-    # Nota: El webhook se debe configurar manualmente visitando:
-    # https://api.telegram.org/bot<TOKEN>/setWebhook?url=<WEBAPP_URL>/webhook
+    # Configurar webhook automáticamente
+    setup_webhook()
+    
+    print("=" * 50)
     
     app.run(host='0.0.0.0', port=port, debug=False)

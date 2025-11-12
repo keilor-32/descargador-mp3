@@ -1,5 +1,6 @@
+Flask==3.0.3
 python-telegram-bot==20.7
-Flask==3.0.0
 yt-dlp
-ffmpeg-python
 gunicorn
+ffmpeg-python
+

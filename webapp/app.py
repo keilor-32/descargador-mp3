@@ -2,6 +2,12 @@ from flask import Flask, render_template, request, send_file
 import os
 import threading
 import yt_dlp
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+
+# ---------------- CONFIGURACIÓN ----------------
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://tu-app.onrender.com")  # Configura esto en Render
 
 # ---------------- FLASK ----------------
 app = Flask(__name__)
@@ -39,18 +45,25 @@ def descargar():
         return f"Ocurrió un error: {str(e)}"
 
 # ---------------- BOT TELEGRAM ----------------
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 ¡Hola! Envíame un enlace de YouTube y te lo descargo en MP3 o MP4.")
+    """Comando /start con botón de Mini App"""
+    keyboard = [
+        [InlineKeyboardButton("🎧 Abrir descargador", web_app=WebAppInfo(url=WEBAPP_URL))]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "👋 ¡Hola! Soy el bot descargador.\n\n"
+        "Pulsa el botón para abrir la mini app y descargar MP3 o MP4.",
+        reply_markup=reply_markup
+    )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Manejo de enlaces directo en el chat (opcional)"""
     url = update.message.text
     if "youtube.com" not in url and "youtu.be" not in url:
-        await update.message.reply_text("❌ Envíame un enlace válido de YouTube.")
+        await update.message.reply_text(
+            "❌ Envíame un enlace válido de YouTube o usa el botón del /start"
+        )
         return
 
     await update.message.reply_text("⏳ Descargando tu video...")
@@ -74,17 +87,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error al descargar: {str(e)}")
 
 def iniciar_bot():
+    """Inicia el bot de Telegram en un thread separado"""
     if not BOT_TOKEN:
         print("⚠️ No se ha configurado BOT_TOKEN.")
         return
+    
     print("🤖 Iniciando bot de Telegram...")
     app_bot = ApplicationBuilder().token(BOT_TOKEN).build()
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # Usar polling en lugar de webhook para Render gratuito
     app_bot.run_polling(drop_pending_updates=True)
 
 # ---------------- EJECUCIÓN ----------------
-def iniciar_todo():
-    threading.Thread(target=iniciar_bot, daemon=True).start()
-
-iniciar_todo()
+if __name__ == '__main__':
+    # Iniciar bot en thread separado
+    bot_thread = threading.Thread(target=iniciar_bot, daemon=True)
+    bot_thread.start()
+    
+    # Iniciar Flask
+    port = int(os.getenv("PORT", 5000))
+    print(f"🌐 Iniciando Flask en puerto {port}...")
+    app.run(host='0.0.0.0', port=port, debug=False)

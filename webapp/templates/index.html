@@ -1,59 +1,18 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Descargador — YouTube a MP3/MP4</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background: linear-gradient(180deg, #fff8e1, #ffe082);
-      text-align: center;
-      padding: 30px;
-      color: #333;
-    }
-    h2 { color: #ff9800; margin-bottom: 6px; }
-    p { margin-top: 0; color: #444; }
-    form {
-      background: #fff;
-      border-radius: 12px;
-      padding: 20px;
-      display: inline-block;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-    }
-    input, select {
-      width: 90%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      font-size: 15px;
-    }
-    button {
-      background: #ff9800;
-      color: white;
-      border: none;
-      padding: 10px 18px;
-      border-radius: 10px;
-      font-size: 15px;
-      cursor: pointer;
-    }
-    small { color: #666; display:block; margin-top:8px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Descargador de YouTube</title>
 </head>
 <body>
-  <h2>🎵 YouTube → MP3 / MP4</h2>
-  <p>Pega el enlace y elige el formato. Sin cookies ni login para videos públicos.</p>
-  <form method="POST" action="/download">
-    <input type="text" name="url" placeholder="https://www.youtube.com/watch?v=..." required>
-    <br>
-    <select name="formato" aria-label="Formato">
-      <option value="mp3">MP3 (solo audio)</option>
-      <option value="mp4">MP4 (video)</option>
-    </select>
-    <br>
-    <button type="submit">Descargar</button>
-    <small>Si el video tiene restricciones de edad o es privado, no podrá descargarse.</small>
-  </form>
+    <h1>🎵 Descargador de YouTube</h1>
+    <form action="/descargar" method="POST">
+        <input type="text" name="url" placeholder="Pega el enlace de YouTube" required>
+        <select name="formato">
+            <option value="mp3">MP3 (Audio)</option>
+            <option value="mp4">MP4 (Video)</option>
+        </select>
+        <button type="submit">Descargar</button>
+    </form>
 </body>
 </html>
